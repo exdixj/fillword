@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0a0a14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Филворд</title>
+<style>
+:root, [data-theme="dark"] {
+  --bg: #0a0a14; --bg-secondary: #12161f; --bg-card: #1c2230;
+  --text: #e0e0e0; --text-dim: #8892a5;
+  --accent: #3a8df5; --accent-hover: #5a9dff;
+  --success: #34a854; --success-bg: #1e4d2b; --success-text: #8ee69e;
+  --danger: #e74c3c; --danger-hover: #ff5c4a;
+  --border: #2a3345; --cell-bg: #1c2230;
+}
+[data-theme="light"] {
+  --bg: #f0f4f8; --bg-secondary: #ffffff; --bg-card: #e4ebf2;
+  --text: #1a2030; --text-dim: #6b7a91;
+  --accent: #2a7de5; --accent-hover: #1a6dd5;
+  --success: #28a745; --success-bg: #d4f4dc; --success-text: #1e6b2e;
+  --danger: #e74c3c; --danger-hover: #d63426;
+  --border: #d1d8e0; --cell-bg: #e4ebf2;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0; height: 100vh; height: 100dvh;
+  overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg); color: var(--text);
+  user-select: none; -webkit-user-select: none;
+  touch-action: manipulation; overscroll-behavior: contain;
+  transition: background 0.2s, color 0.2s;
+}
+.screen { position: fixed; inset: 0; display: none; }
+.screen.active { display: flex; }
+
+/* ===== МЕНЮ ===== */
+#screen-menu {
+  flex-direction: column; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 50% 30%, rgba(58,141,245,0.18), transparent 70%), var(--bg);
+  padding: 20px;
+}
+.menu-hero { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; }
+.menu-title { font-size: 44px; font-weight: 800; text-align: center; letter-spacing: -1px; margin-bottom: 4px;
+  background: linear-gradient(135deg, var(--accent), #a855f7);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.menu-subtitle { text-align: center; color: var(--text-dim); font-size: 15px; margin-bottom: 24px; }
+.menu-btn {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 20px; font-size: 17px; font-weight: 600;
+  border: none; border-radius: 12px;
+  background: var(--bg-card); color: var(--text);
+  cursor: pointer; transition: transform 0.1s, background 0.15s;
+  width: 100%; text-align: left;
+}
+.menu-btn:active { transform: scale(0.97); }
+.menu-btn:hover { background: var(--border); }
+.menu-btn.primary {
+  background: linear-gradient(135deg, var(--accent), #6b5ce7);
+  color: #fff; font-size: 19px; padding: 20px;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(58,141,245,0.35);
+}
+.menu-btn.primary:hover { background: linear-gradient(135deg, var(--accent-hover), #7d6ef5); }
+.menu-btn.danger { color: var(--danger); }
+.menu-btn.danger:hover { background: rgba(231,76,60,0.12); }
+.menu-icon { font-size: 20px; }
+.menu-footer {
+  text-align: center; margin-top: 24px; font-size: 14px;
+  color: var(--text-dim);
+}
+
+/* ===== ИГРА ===== */
+#screen-game { flex-direction: column; padding: 8px; gap: 8px; }
+.game-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 4px; font-size: 15px; font-weight: 600;
+  flex-shrink: 0; gap: 8px;
+}
+.header-btn {
+  background: var(--bg-card); border: none; color: var(--text);
+  width: 42px; height: 42px; border-radius: 10px;
+  font-size: 20px; cursor: pointer; flex-shrink: 0;
+  transition: background 0.15s;
+}
+.header-btn:active { transform: scale(0.95); }
+.game-header .level-info { flex: 1; text-align: center; font-size: 15px; }
+.grid-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.grid {
+  display: grid; gap: 3px; touch-action: none;
+  user-select: none; -webkit-user-select: none;
+}
+.cell {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--cell-bg); border-radius: 6px;
+  font-weight: 700; color: var(--text);
+  transition: background 0.12s, transform 0.1s;
+}
+.cell.selected { background: var(--accent); color: #fff; }
+.cell.found {
+  background: var(--success);
+  color: #fff;
+  animation: pulse 0.4s ease;
+}
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.words {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  flex-shrink: 0; padding: 6px;
+  background: var(--bg-secondary); border-radius: 8px;
+  max-height: 135px; overflow-y: auto; font-size: 14px;
+}
+.word {
+  padding: 6px 8px; background: var(--bg-card);
+  border-radius: 6px; text-align: center;
+  color: var(--text-dim); transition: all 0.25s;
+}
+.word.found {
+  background: var(--success-bg); color: var(--success-text);
+  text-decoration: line-through;
+}
+.game-buttons { display: flex; gap: 8px; flex-shrink: 0; }
+.game-buttons button {
+  flex: 1; padding: 13px; font-size: 15px; font-weight: 600;
+  border: none; border-radius: 10px;
+  background: var(--bg-card); color: var(--text);
+  cursor: pointer; transition: background 0.15s;
+}
+.game-buttons button:active { transform: scale(0.97); }
+
+/* ===== НАСТРОЙКИ ===== */
+#screen-settings {
+  flex-direction: column; padding: 20px; overflow-y: auto;
+  align-items: center;
+}
+.settings-content { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 16px; }
+.settings-content h2 { margin: 0 0 8px; font-size: 24px; text-align: center; }
+.setting {
+  background: var(--bg-card); border-radius: 12px; padding: 16px;
+}
+.setting label { display: block; font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+.slider-row { display: flex; align-items: center; gap: 12px; }
+.slider-row input[type="range"] {
+  flex: 1; accent-color: var(--accent); height: 6px; cursor: pointer;
+}
+.slider-row span { min-width: 48px; text-align: right; font-size: 14px; color: var(--text-dim); }
+.toggle-btn {
+  padding: 10px 20px; border: none; border-radius: 8px;
+  background: var(--success); color: #fff;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: background 0.15s;
+  min-width: 80px;
+}
+.toggle-btn.off { background: var(--text-dim); }
+.danger-btn {
+  padding: 10px 20px; border: none; border-radius: 8px;
+  background: var(--danger); color: #fff;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.back-btn {
+  padding: 15px; border: none; border-radius: 12px;
+  background: var(--bg-card); color: var(--text);
+  font-size: 16px; font-weight: 600; cursor: pointer;
+  margin-top: 8px;
+}
+.back-btn:active { transform: scale(0.98); }
+
+/* ===== МОДАЛКИ ===== */
+.modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; padding: 20px;
+}
+.modal[hidden] { display: none; }
+.modal-content {
+  background: var(--bg-secondary); border-radius: 16px;
+  padding: 22px; max-width: 400px; width: 100%;
+  max-height: 85vh; overflow-y: auto;
+  animation: slideIn 0.22s ease; color: var(--text);
+}
+@keyframes slideIn {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.modal-content h2 { margin: 0 0 14px; text-align: center; font-size: 22px; }
+.modal-content p { text-align: center; line-height: 1.6; margin: 12px 0; color: var(--text-dim); }
+.level-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 16px; }
+.level-btn {
+  aspect-ratio: 1; border: none; border-radius: 8px;
+  background: var(--bg-card); color: var(--text-dim);
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: transform 0.1s;
+}
+.level-btn:active { transform: scale(0.94); }
+.level-btn.done { background: var(--success-bg); color: var(--success-text); }
+.level-btn.current { background: var(--accent); color: #fff; }
+.level-btn.locked { opacity: 0.3; cursor: not-allowed; }
+.modal-btn {
+  width: 100%; padding: 14px; border: none; border-radius: 10px;
+  background: var(--accent); color: #fff;
+  font-size: 16px; font-weight: 600; cursor: pointer;
+  margin-top: 8px;
+}
+.modal-btn:active { transform: scale(0.98); }
+.modal-btn.secondary { background: var(--bg-card); color: var(--text); }
+.modal-btn.danger { background: var(--danger); }
+</style>
+</head>
+<body data-theme="dark">
+
+<!-- ========== МЕНЮ ========== -->
+<div id="screen-menu" class="screen active">
+  <div class="menu-hero">
+    <div class="menu-title">Филворд</div>
+    <div class="menu-subtitle">Найди все слова в сетке букв</div>
+    <button class="menu-btn primary" id="btnPlay">
+      <span class="menu-icon">▶</span> Играть
+    </button>
+    <button class="menu-btn" id="btnLevelsMenu">
+      <span class="menu-icon">📋</span> Уровни
+    </button>
+    <button class="menu-btn" id="btnSettings">
+      <span class="menu-icon">⚙</span> Настройки
+    </button>
+    <button class="menu-btn danger" id="btnExit">
+      <span class="menu-icon">✕</span> Выйти
+    </button>
+  </div>
+  <div class="menu-footer">
+    Пройдено: <span id="menuProgress">0</span> из <span id="menuTotal">30</span>
+  </div>
+</div>
+
+<!-- ========== ИГРА ========== -->
+<div id="screen-game" class="screen">
+  <div class="game-header">
+    <button class="header-btn" id="btnBackToMenu">←</button>
+    <div class="level-info" id="levelLabel">Уровень 1/30</div>
+    <div class="level-info" id="progressLabel">0/3</div>
+  </div>
+  <div class="grid-wrap" id="gridWrap">
+    <div class="grid" id="grid"></div>
+  </div>
+  <div class="words" id="words"></div>
+  <div class="game-buttons">
+    <button id="restartBtn">↻ Заново</button>
+    <button id="levelsBtn">📋 Уровни</button>
+  </div>
+</div>
+
+<!-- ========== НАСТРОЙКИ ========== -->
+<div id="screen-settings" class="screen">
+  <div class="settings-content">
+    <h2>⚙ Настройки</h2>
+    <div class="setting">
+      <label>🔊 Громкость звуков</label>
+      <div class="slider-row">
+        <input type="range" id="volumeSlider" min="0" max="100" value="70">
+        <span id="volumeValue">70%</span>
+      </div>
+    </div>
+    <div class="setting">
+      <label>📳 Вибрация при находке слова</label>
+      <button class="toggle-btn" id="vibrationToggle">Вкл</button>
+    </div>
+    <div class="setting">
+      <label>🎨 Тема оформления</label>
+      <button class="toggle-btn" id="themeToggle">Тёмная</button>
+    </div>
+    <div class="setting">
+      <label>🗑 Сброс прогресса</label>
+      <button class="danger-btn" id="resetProgress">Сбросить всё</button>
+    </div>
+    <button class="back-btn" id="btnBackFromSettings">← Назад в меню</button>
+  </div>
+</div>
+
+<!-- ========== МОДАЛКИ ========== -->
+<div class="modal" id="modal" hidden>
+  <div class="modal-content" id="modalContent"></div>
+</div>
+
+<script>
+'use strict';
+
+/* =============================================
+   1. ДАННЫЕ УРОВНЕЙ
+   ============================================= */
+const LEVELS = [
+  {size:5, words:["ЛУК","СЫР","СОК"], dirs:"hv"},
+  {size:5, words:["ЧАЙ","МЕД","РИС"], dirs:"hv"},
+  {size:5, words:["СУП","ХЛЕБ","ТОРТ"], dirs:"hv"},
+  {size:5, words:["СЛИВА","ГРУША","ДЫНЯ"], dirs:"hv"},
+  {size:5, words:["БАНАН","АРБУЗ","ЛИМОН"], dirs:"hv"},
+  {size:6, words:["МОЛОКО","САХАР","СОЛЬ","ПЕРЕЦ"], dirs:"hv"},
+  {size:6, words:["КЕФИР","СЫРОК","МАСЛО","ТВОРОГ"], dirs:"hv"},
+  {size:6, words:["СЛИВА","ВИШНЯ","АЛЫЧА","ГРУША"], dirs:"hv"},
+  {size:6, words:["ЛОЖКА","ВИЛКА","ЧАШКА","ПИАЛА"], dirs:"hv"},
+  {size:6, words:["КОМПОТ","КИСЕЛЬ","МОРС","КВАС"], dirs:"hv"},
+  {size:7, words:["ПОМИДОР","ОГУРЕЦ","СВЕКЛА","ТЫКВА","ЛУК"], dirs:"all"},
+  {size:7, words:["КОТЛЕТА","ВЕТЧИНА","БЕКОН","ФАРШ","СОСИСКА"], dirs:"all"},
+  {size:7, words:["ПРЯНИК","БАТОН","БУЛКА","ПИТА","ЛАВАШ"], dirs:"all"},
+  {size:7, words:["КАПУСТА","МОРКОВЬ","РЕДИС","САЛАТ","ШПИНАТ"], dirs:"all"},
+  {size:7, words:["ПЕЧЕНЬЕ","ВАФЛИ","ХАЛВА","ПАСТИЛА","ЗЕФИР"], dirs:"all"},
+  {size:7, words:["ДУРШЛАГ","ТЕРКА","ВЕНОЧЕК","ЛОПАТКА","СКАЛКА"], dirs:"all"},
+  {size:7, words:["СЕЛЬДЬ","САРДИНА","ТУНЕЦ","ЛОСОСЬ","КАРП"], dirs:"all"},
+  {size:7, words:["ВИШНЯ","ЧЕРЕШНЯ","АБРИКОС","ПЕРСИК","СЛИВА"], dirs:"all"},
+  {size:7, words:["ТВОРОГ","ЙОГУРТ","КЕФИР","МОЛОКО","СЫРОК"], dirs:"all"},
+  {size:7, words:["БУЛЬОН","ЛАПША","КАША","ПЛОВ","РИС"], dirs:"all"},
+  {size:8, words:["АПЕЛЬСИН","МАНДАРИН","БАНАН","ЛИМОН","ГРУША","КИВИ"], dirs:"all"},
+  {size:8, words:["БАКЛАЖАН","КАБАЧОК","ПОМИДОР","ОГУРЕЦ","ПЕРЕЦ","ЛУК"], dirs:"all"},
+  {size:8, words:["КАСТРЮЛЯ","ПОЛОВНИК","ДУРШЛАГ","ТЕРКА","ВЕНОЧЕК"], dirs:"all"},
+  {size:8, words:["КЛУБНИКА","МАЛИНА","ЕЖЕВИКА","ГОЛУБИКА","ВИШНЯ","СЛИВА"], dirs:"all"},
+  {size:8, words:["ПЕТРУШКА","УКРОП","БАЗИЛИК","КИНЗА","МЯТА","РОЗМАРИН"], dirs:"all"},
+  {size:8, words:["ШОКОЛАД","ПЕЧЕНЬЕ","КОНФЕТА","ВАФЛИ","ПРЯНИК","ТОРТ"], dirs:"all"},
+  {size:8, words:["ОКОРОК","КОЛБАСА","ВЕТЧИНА","СОСИСКА","БЕКОН","ФАРШ"], dirs:"all"},
+  {size:8, words:["КАПУСТА","МОРКОВЬ","СВЕКЛА","РЕДИС","РЕПА","БРЮКВА"], dirs:"all"},
+  {size:8, words:["ГРУЗДЬ","ВЕШЕНКА","ЛИСИЧКА","БОРОВИК","СЫРОЕЖКА","МУХОМОР"], dirs:"all"},
+  {size:8, words:["СМЕТАНА","ТВОРОГ","СЛИВКИ","МОЛОКО","ЙОГУРТ","КЕФИР"], dirs:"all"}
+];
+
+const DIRS_ALL = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+const DIRS_HV  = [[1,0],[-1,0],[0,1],[0,-1]];
+const ALPHABET = "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ";
+
+/* =============================================
+   2. ЗВУКОВОЙ ДВИЖОК (Web Audio API)
+   ============================================= */
+class SoundEngine {
+  constructor() {
+    this.ctx = null;
+    this.volume = 0.7;
+  }
+  ensure() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      this.ctx = new AC();
+    }
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    return true;
+  }
+  tone(freq, duration, type = 'sine', when = 0, gain = 0.3) {
+    if (this.volume <= 0) return;
+    if (!this.ensure()) return;
+    const t = this.ctx.currentTime + when;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain * this.volume, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.connect(g);
+    g.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + duration + 0.05);
+  }
+  click() {
+    this.tone(700, 0.06, 'sine', 0, 0.15);
+  }
+  success() {
+    this.tone(523.25, 0.10, 'sine', 0.00, 0.28);  // C5
+    this.tone(659.25, 0.10, 'sine', 0.09, 0.28);  // E5
+    this.tone(783.99, 0.18, 'sine', 0.18, 0.28);  // G5
+  }
+  error() {
+    this.tone(220, 0.13, 'square', 0.00, 0.15);
+    this.tone(165, 0.18, 'square', 0.09, 0.15);
+  }
+  complete() {
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((f, i) => this.tone(f, 0.18, 'sine', i * 0.13, 0.30));
+    this.tone(1318.51, 0.6, 'sine', 0.55, 0.28);  // E6 final
+  }
+}
+const Sound = new SoundEngine();
+
+/* =============================================
+   3. ВИБРАЦИЯ
+   ============================================= */
+function vibrate(pattern) {
+  if (!settings.vibration) return;
+  if (navigator.vibrate) navigator.vibrate(pattern);
+}
+
+/* =============================================
+   4. НАСТРОЙКИ (сохраняются в localStorage)
+   ============================================= */
+const SETTINGS_KEY = 'fillword_settings_v1';
+const LEVEL_KEY = 'fillword_level_v1';
+
+const defaultSettings = { volume: 70, vibration: true, theme: 'dark' };
+let settings = { ...defaultSettings };
+try {
+  const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+  settings = { ...defaultSettings, ...saved };
+} catch(_) {}
+
+function saveSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch(_) {}
+  Sound.volume = settings.volume / 100;
+  document.body.dataset.theme = settings.theme;
+}
+
+/* =============================================
+   5. ПРОГРЕСС
+   ============================================= */
+let unlockedLevel = 0;
+try { unlockedLevel = parseInt(localStorage.getItem(LEVEL_KEY) || '0', 10) || 0; } catch(_) {}
+if (unlockedLevel >= LEVELS.length) unlockedLevel = LEVELS.length - 1;
+
+function saveProgress() {
+  try { localStorage.setItem(LEVEL_KEY, String(unlockedLevel)); } catch(_) {}
+}
+
+/* =============================================
+   6. ГЕНЕРАЦИЯ СЕТКИ
+   ============================================= */
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+}
+function tryGenerate(size, words, dirsKey) {
+  const dirs = dirsKey === 'all' ? DIRS_ALL : DIRS_HV;
+  const grid = Array.from({ length: size }, () => Array(size).fill(''));
+  for (const word of [...words].sort((a, b) => b.length - a.length)) {
+    const positions = [];
+    for (let r = 0; r < size; r++)
+      for (let c = 0; c < size; c++)
+        for (const [dr, dc] of dirs) positions.push([r, c, dr, dc]);
+    shuffle(positions);
+    let ok = false;
+    for (const [r, c, dr, dc] of positions) {
+      const er = r + dr * (word.length - 1);
+      const ec = c + dc * (word.length - 1);
+      if (er < 0 || er >= size || ec < 0 || ec >= size) continue;
+      let fits = true;
+      for (let i = 0; i < word.length; i++) {
+        const ch = grid[r + dr * i][c + dc * i];
+        if (ch && ch !== word[i]) { fits = false; break; }
+      }
+      if (fits) {
+        for (let i = 0; i < word.length; i++) grid[r + dr * i][c + dc * i] = word[i];
+        ok = true;
+        break;
+      }
+    }
+    if (!ok) return null;
+  }
+  for (let r = 0; r < size; r++)
+    for (let c = 0; c < size; c++)
+      if (!grid[r][c]) grid[r][c] = ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+  return grid;
+}
+function generateGrid(size, words, dirsKey) {
+  for (let i = 0; i < 300; i++) {
+    const g = tryGenerate(size, words, dirsKey);
+    if (g) return g;
+  }
+  throw new Error('Не удалось сгенерировать уровень');
+}
+
+/* =============================================
+   7. СОСТОЯНИЕ ИГРЫ
+   ============================================= */
+const state = {
+  levelIdx: 0,
+  level: null,
+  grid: null,
+  found: new Set(),
+  startCell: null,
+  selection: []
+};
+
+/* =============================================
+   8. DOM-ССЫЛКИ
+   ============================================= */
+const $ = id => document.getElementById(id);
+const screens = {
+  menu: $('screen-menu'),
+  game: $('screen-game'),
+  settings: $('screen-settings')
+};
+const gridEl = $('grid');
+const gridWrap = $('gridWrap');
+const wordsEl = $('words');
+const levelLabel = $('levelLabel');
+const progressLabel = $('progressLabel');
+const modal = $('modal');
+const modalContent = $('modalContent');
+
+function showScreen(name) {
+  for (const s of Object.values(screens)) s.classList.remove('active');
+  screens[name].classList.add('active');
+  if (name === 'menu') updateMenuProgress();
+  if (name === 'game') requestAnimationFrame(() => { resizeGrid(); updateCellFont(); });
+}
+
+function updateMenuProgress() {
+  $('menuProgress').textContent = unlockedLevel;
+  $('menuTotal').textContent = LEVELS.length;
+}
+
+/* =============================================
+   9. РЕНДЕР
+   ============================================= */
+function renderGrid() {
+  const n = state.level.size;
+  gridEl.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+  gridEl.innerHTML = '';
+  for (let r = 0; r < n; r++)
+    for (let c = 0; c < n; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.r = r;
+      cell.dataset.c = c;
+      cell.textContent = state.grid[r][c];
+      gridEl.appendChild(cell);
+    }
+  requestAnimationFrame(() => { resizeGrid(); updateCellFont(); });
+}
+
+function renderWords() {
+  wordsEl.innerHTML = '';
+  for (const w of state.level.words) {
+    const d = document.createElement('div');
+    d.className = 'word' + (state.found.has(w) ? ' found' : '');
+    d.dataset.word = w;
+    d.textContent = w;
+    wordsEl.appendChild(d);
+  }
+}
+
+function updateProgress() {
+  progressLabel.textContent = `${state.found.size}/${state.level.words.length}`;
+}
+
+function resizeGrid() {
+  const size = Math.min(gridWrap.clientWidth, gridWrap.clientHeight);
+  gridEl.style.width = size + 'px';
+  gridEl.style.height = size + 'px';
+}
+
+function updateCellFont() {
+  const n = state.level.size;
+  const gap = 3 * (n - 1);
+  const cellSize = (gridEl.clientWidth - gap) / n;
+  const fs = Math.max(13, Math.floor(cellSize * 0.42));
+  gridEl.style.fontSize = fs + 'px';
+}
+
+/* =============================================
+   10. ВВОД / ВЫДЕЛЕНИЕ
+   ============================================= */
+function updateSelectionVisual() {
+  const sel = new Set(state.selection.map(p => p.r * state.level.size + p.c));
+  for (let i = 0; i < gridEl.children.length; i++)
+    gridEl.children[i].classList.toggle('selected', sel.has(i));
+}
+
+function computeLine(a, b) {
+  const dr = b.r - a.r, dc = b.c - a.c;
+  if (dr === 0 && dc === 0) return [a];
+  let step, n;
+  if (dr === 0) { step = [0, dc > 0 ? 1 : -1]; n = Math.abs(dc); }
+  else if (dc === 0) { step = [dr > 0 ? 1 : -1, 0]; n = Math.abs(dr); }
+  else if (Math.abs(dr) === Math.abs(dc)) { step = [dr > 0 ? 1 : -1, dc > 0 ? 1 : -1]; n = Math.abs(dr); }
+  else return null;
+  const res = [a];
+  for (let i = 1; i <= n; i++) res.push({ r: a.r + step[0] * i, c: a.c + step[1] * i });
+  return res;
+}
+
+gridEl.addEventListener('pointerdown', e => {
+  if (!e.isPrimary) return;
+  const cell = e.target.closest('.cell');
+  if (!cell) return;
+  const r = +cell.dataset.r, c = +cell.dataset.c;
+  state.startCell = { r, c };
+  state.selection = [{ r, c }];
+  updateSelectionVisual();
+  try { gridEl.setPointerCapture(e.pointerId); } catch(_) {}
+});
+
+gridEl.addEventListener('pointermove', e => {
+  if (!state.startCell) return;
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const cell = el && el.closest && el.closest('.cell');
+  if (!cell || !gridEl.contains(cell)) return;
+  const r = +cell.dataset.r, c = +cell.dataset.c;
+  const line = computeLine(state.startCell, { r, c });
+  if (line) { state.selection = line; updateSelectionVisual(); }
+});
+
+function finishSelection() {
+  if (!state.startCell) return;
+  if (state.selection.length >= 2) tryWord();
+  state.startCell = null;
+  state.selection = [];
+  updateSelectionVisual();
+}
+gridEl.addEventListener('pointerup', finishSelection);
+gridEl.addEventListener('pointercancel', () => {
+  state.startCell = null;
+  state.selection = [];
+  updateSelectionVisual();
+});
+
+/* =============================================
+   11. ЛОГИКА СЛОВ
+   ============================================= */
+function tryWord() {
+  const word = state.selection.map(p => state.grid[p.r][p.c]).join('');
+  const rword = [...word].reverse().join('');
+  for (const target of state.level.words) {
+    if (state.found.has(target)) continue;
+    if (word === target || rword === target) {
+      state.found.add(target);
+      for (const p of state.selection) {
+        const el = gridEl.children[p.r * state.level.size + p.c];
+        if (el) el.classList.add('found');
+      }
+      const w = wordsEl.querySelector(`.word[data-word="${target}"]`);
+      if (w) w.classList.add('found');
+      updateProgress();
+      Sound.success();
+      vibrate(40);
+      if (state.found.size === state.level.words.length) {
+        setTimeout(onLevelComplete, 400);
+      }
+      return;
+    }
+  }
+  Sound.error();
+  vibrate([20, 50, 20]);
+}
+
+/* =============================================
+   12. ЗАГРУЗКА УРОВНЯ
+   ============================================= */
+function loadLevel(idx) {
+  state.levelIdx = idx;
+  state.level = LEVELS[idx];
+  state.grid = generateGrid(state.level.size, state.level.words, state.level.dirs);
+  state.found.clear();
+  state.selection = [];
+  state.startCell = null;
+  levelLabel.textContent = `Уровень ${idx + 1}/${LEVELS.length}`;
+  renderGrid();
+  renderWords();
+  updateProgress();
+}
+
+/* =============================================
+   13. МОДАЛКИ
+   ============================================= */
+function showModal(html) {
+  modalContent.innerHTML = html;
+  modal.hidden = false;
+}
+function hideModal() {
+  modal.hidden = true;
+}
+
+function onLevelComplete() {
+  Sound.complete();
+  vibrate([100, 50, 100, 50, 200]);
+
+  if (state.levelIdx + 1 > unlockedLevel) {
+    unlockedLevel = Math.min(state.levelIdx + 1, LEVELS.length - 1);
+    saveProgress();
+    updateMenuProgress();
+  }
+
+  const hasNext = state.levelIdx + 1 < LEVELS.length;
+  let html = '<h2>🎉 Уровень пройден!</h2>';
+  html += '<p>Отлично! Все слова найдены.</p>';
+  if (hasNext) html += '<button class="modal-btn" id="mNext">Следующий →</button>';
+  html += '<button class="modal-btn secondary" id="mLevels">К списку уровней</button>';
+  html += '<button class="modal-btn secondary" id="mMenu">В главное меню</button>';
+  showModal(html);
+
+  $('mLevels').onclick = () => { Sound.click(); hideModal(); showLevels(); };
+  $('mMenu').onclick = () => { Sound.click(); hideModal(); showScreen('menu'); };
+  if (hasNext) $('mNext').onclick = () => {
+    Sound.click(); hideModal();
+    loadLevel(state.levelIdx + 1);
+  };
+}
+
+function showLevels() {
+  let html = '<h2>📋 Уровни</h2><div class="level-grid">';
+  for (let i = 0; i < LEVELS.length; i++) {
+    let cls = 'level-btn';
+    if (i < unlockedLevel) cls += ' done';
+    else if (i === unlockedLevel) cls += ' current';
+    else cls += ' locked';
+    const dis = i > unlockedLevel ? 'disabled' : '';
+    html += `<button class="${cls}" data-idx="${i}" ${dis}>${i + 1}</button>`;
+  }
+  html += '</div><button class="modal-btn secondary" id="mCloseLevels">Закрыть</button>';
+  showModal(html);
+  modalContent.querySelectorAll('.level-btn:not(.locked)').forEach(b => {
+    b.onclick = () => {
+      Sound.click();
+      hideModal();
+      loadLevel(+b.dataset.idx);
+      if (!screens.game.classList.contains('active')) showScreen('game');
+    };
+  });
+  $('mCloseLevels').onclick = () => { Sound.click(); hideModal(); };
+}
+
+/* =============================================
+   14. НАСТРОЙКИ UI
+   ============================================= */
+function applySettingsToUI() {
+  $('volumeSlider').value = settings.volume;
+  $('volumeValue').textContent = settings.volume + '%';
+  const vib = $('vibrationToggle');
+  vib.textContent = settings.vibration ? 'Вкл' : 'Выкл';
+  vib.classList.toggle('off', !settings.vibration);
+  const th = $('themeToggle');
+  th.textContent = settings.theme === 'dark' ? 'Тёмная' : 'Светлая';
+  th.classList.toggle('off', settings.theme === 'light');
+}
+
+$('volumeSlider').addEventListener('input', e => {
+  settings.volume = +e.target.value;
+  $('volumeValue').textContent = settings.volume + '%';
+  Sound.volume = settings.volume / 100;
+  saveSettings();
+});
+$('volumeSlider').addEventListener('change', () => Sound.click());
+
+$('vibrationToggle').onclick = () => {
+  settings.vibration = !settings.vibration;
+  saveSettings();
+  applySettingsToUI();
+  if (settings.vibration) vibrate(50);
+  Sound.click();
+};
+
+$('themeToggle').onclick = () => {
+  settings.theme = settings.theme === 'dark' ? 'light' : 'dark';
+  saveSettings();
+  applySettingsToUI();
+  Sound.click();
+};
+
+$('resetProgress').onclick = () => {
+  Sound.click();
+  showModal(`
+    <h2>Сбросить прогресс?</h2>
+    <p>Все открытые уровни будут снова закрыты.</p>
+    <button class="modal-btn danger" id="mConfirmReset">Да, сбросить</button>
+    <button class="modal-btn secondary" id="mCancelReset">Отмена</button>
+  `);
+  $('mConfirmReset').onclick = () => {
+    unlockedLevel = 0;
+    saveProgress();
+    updateMenuProgress();
+    state.found.clear();
+    state.level = null;
+    hideModal();
+    Sound.click();
+  };
+  $('mCancelReset').onclick = () => { Sound.click(); hideModal(); };
+};
+
+/* =============================================
+   15. НАВИГАЦИЯ МЕЖДУ ЭКРАНАМИ
+   ============================================= */
+$('btnPlay').onclick = () => {
+  Sound.click();
+  // Если игра не загружена или текущий уровень уже пройден — загружаем актуальный
+  if (!state.level || (state.level && state.found.size === state.level.words.length)) {
+    loadLevel(unlockedLevel);
+  }
+  showScreen('game');
+};
+
+$('btnLevelsMenu').onclick = () => { Sound.click(); showLevels(); };
+$('btnSettings').onclick = () => { Sound.click(); applySettingsToUI(); showScreen('settings'); };
+$('btnBackFromSettings').onclick = () => { Sound.click(); showScreen('menu'); };
+$('btnBackToMenu').onclick = () => { Sound.click(); showScreen('menu'); };
+
+$('btnExit').onclick = () => {
+  Sound.click();
+  saveSettings();
+  saveProgress();
+  showModal(`
+    <h2>👋 До встречи!</h2>
+    <p>Прогресс сохранён.<br>Можете закрыть вкладку браузера.</p>
+    <button class="modal-btn secondary" id="mStay">Остаться в игре</button>
+  `);
+  $('mStay').onclick = () => { Sound.click(); hideModal(); };
+};
+
+$('restartBtn').onclick = () => {
+  Sound.click();
+  if (state.level) loadLevel(state.levelIdx);
+};
+
+$('levelsBtn').onclick = () => { Sound.click(); showLevels(); };
+
+/* =============================================
+   16. АДАПТАЦИЯ
+   ============================================= */
+function refreshLayout() {
+  if (state.level) { resizeGrid(); updateCellFont(); }
+}
+window.addEventListener('resize', refreshLayout);
+window.addEventListener('orientationchange', () => setTimeout(refreshLayout, 150));
+if (window.ResizeObserver) new ResizeObserver(refreshLayout).observe(gridWrap);
+
+/* =============================================
+   17. СТАРТ
+   ============================================= */
+saveSettings();
+applySettingsToUI();
+updateMenuProgress();
+</script>
+</body>
+</html>
